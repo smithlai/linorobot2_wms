@@ -5,7 +5,7 @@ Test steps:
 
 ```
 export LINOROBOT2_BASE=2wd
-export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/lino_usi_ws/src/linorobot2_wms/wms_navigation/models/
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:[your workspace]/src/linorobot2_wms/wms_navigation/models/
 ```
 
 2. run gazebo for our office
