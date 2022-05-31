@@ -8,7 +8,7 @@ export LINOROBOT2_BASE=2wd
 export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:[your workspace]/src/linorobot2_wms/wms_navigation/models/
 ```
 
-2. run gazebo for our office
+2. run gazebo for the office world
 ```
 ros2 launch wms_navigation wms_gazebo.launch.py
 ```
