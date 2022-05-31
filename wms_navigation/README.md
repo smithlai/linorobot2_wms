@@ -15,7 +15,7 @@ ros2 launch wms_navigation wms_gazebo.launch.py
 
 3. launch navigation with slam
 ```
-ros2 launch wms_navigation wms_avigation.launch.py rviz:=True sim:=True slam:=True
+ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True
 ```
 
 4. save the map
