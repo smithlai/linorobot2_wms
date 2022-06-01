@@ -32,6 +32,7 @@ install(DIRECTORY
   rviz 
   src 
   worlds
+  scripts
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -44,7 +45,8 @@ ament_python_install_package(${PROJECT_NAME})
 #   'map_to_base_link_transform.py' not found on the libexec directory '/home/smith/dev_ws/install/linorobot2_my_c_pkg/lib/linorobot2_my_c_pkg'
 # on Node(package=package_name, executable='map_to_base_link_transform.py')
 install(PROGRAMS
-  # scripts/xxxxxx.py
+  scripts/robot_navigator.py
+  scripts/waypoint_follower_tst.py
   DESTINATION lib/${PROJECT_NAME}
 )
 if(BUILD_TESTING)
