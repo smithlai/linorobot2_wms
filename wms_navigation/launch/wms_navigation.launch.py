@@ -21,6 +21,9 @@ from launch.conditions import IfCondition
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
+package_name = 'wms_navigation'
+pkg_share = FindPackageShare(package=package_name).find(package_name)
+
 MAP_NAME='wms2' #change to the name of your own map here
 
 def generate_launch_description():
@@ -31,15 +34,15 @@ def generate_launch_description():
     )
 
     rviz_config_path = PathJoinSubstitution(
-        [FindPackageShare('wms_navigation'), 'rviz', 'wms_navigation.rviz']
+        [pkg_share, 'rviz', 'wms_navigation.rviz']
     )
 
     default_map_path = PathJoinSubstitution(
-        [FindPackageShare('wms_navigation'), 'maps', f'{MAP_NAME}.yaml']
+        [pkg_share, 'maps', f'{MAP_NAME}.yaml']
     )
 
     nav2_config_path = PathJoinSubstitution(
-        [FindPackageShare('wms_navigation'), 'config', 'navigation.yaml']
+        [pkg_share, 'config', 'navigation.yaml']
     )
 
     return LaunchDescription([

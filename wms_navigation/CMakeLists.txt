@@ -5,14 +5,48 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+
+# Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+# find_package(geometry_msgs REQUIRED)
+# find_package(nav_msgs REQUIRED)
+# find_package(sensor_msgs REQUIRED)
+# find_package(std_msgs REQUIRED)
+# find_package(action_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
+# Include cpp "include" directory
+include_directories(include)
+
+install(DIRECTORY 
+  ${PROJECT_NAME} 
+  include 
+  launch
+  maps 
+  models 
+  rviz 
+  src 
+  worlds
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# Install Python modules
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+# This is equals to entry_point in setup.py 
+# Without this will occurs:
+#   'map_to_base_link_transform.py' not found on the libexec directory '/home/smith/dev_ws/install/linorobot2_my_c_pkg/lib/linorobot2_my_c_pkg'
+# on Node(package=package_name, executable='map_to_base_link_transform.py')
+install(PROGRAMS
+  # scripts/xxxxxx.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
@@ -23,10 +57,5 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-install(
-  DIRECTORY launch rviz config maps worlds models
-  DESTINATION share/${PROJECT_NAME}
-)
 
 ament_package()

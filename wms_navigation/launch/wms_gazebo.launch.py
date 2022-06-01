@@ -23,6 +23,8 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     use_sim_time = True
+    package_name = 'wms_navigation'
+    pkg_share = FindPackageShare(package=package_name).find(package_name)
 
     #joy_launch_path = PathJoinSubstitution(
     #    [FindPackageShare('linorobot2_bringup'), 'launch', 'joy_teleop.launch.py']
@@ -33,13 +35,21 @@ def generate_launch_description():
     )
 
     world_path = PathJoinSubstitution(
-        [FindPackageShare("wms_navigation"), "worlds", "wms.world"]
+        [pkg_share, "worlds", "wms.world"]
     )
 
     description_launch_path = PathJoinSubstitution(
         [FindPackageShare('linorobot2_description'), 'launch', 'description.launch.py']
     )
-
+    ## in CMakelist.txt
+    # install(DIRECTORY 
+    #     ...
+    #     models 
+    #     ...
+    #     DESTINATION share/${PROJECT_NAME}
+    # )
+    os.environ["GAZEBO_MODEL_PATH"] = os.path.join(pkg_share, "models")
+    
     return LaunchDescription([
         ExecuteProcess(
             cmd=['gazebo', '--verbose', '-s', 'libgazebo_ros_factory.so',  '-s', 'libgazebo_ros_init.so', world_path],
@@ -53,7 +63,7 @@ def generate_launch_description():
             output='screen',
             arguments=["-topic", "robot_description", "-entity", "linorobot2"]
         ),
-
+        # This may force stop robot /cmd_vel
         #Node(
         #    package='linorobot2_gazebo',
         #    executable='command_timeout.py',
