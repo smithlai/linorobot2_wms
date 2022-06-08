@@ -17,7 +17,7 @@ install(
 )
 
 install(PROGRAMS
-  scripts/command_timeout.py
+  ${PROJECT_NAME}/command_timeout.py
   DESTINATION lib/${PROJECT_NAME}
 )
 ament_package()
