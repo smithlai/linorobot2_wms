@@ -27,6 +27,7 @@ install(DIRECTORY
   ${PROJECT_NAME} 
   include 
   launch
+  config
   maps 
   models 
   rviz 
