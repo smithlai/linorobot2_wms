@@ -24,7 +24,7 @@ find_package(rclpy REQUIRED)
 include_directories(include)
 
 install(DIRECTORY 
-  ${PROJECT_NAME} 
+  ${PROJECT_NAME}
   include 
   launch
   config
@@ -46,6 +46,7 @@ ament_python_install_package(${PROJECT_NAME})
 #   'map_to_base_link_transform.py' not found on the libexec directory '/home/smith/dev_ws/install/linorobot2_my_c_pkg/lib/linorobot2_my_c_pkg'
 # on Node(package=package_name, executable='map_to_base_link_transform.py')
 install(PROGRAMS
+  ${PROJECT_NAME}/slam_subscriber.py
   scripts/robot_navigator.py
   scripts/waypoint_follower_tst.py
   DESTINATION lib/${PROJECT_NAME}

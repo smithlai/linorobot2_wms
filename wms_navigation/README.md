@@ -1,5 +1,16 @@
 # Readme
-Test steps:
+
+## Installation
+1. install ROS2
+2. Install pip3
+```sh
+sudo apt install python3-pip
+pip install numpy
+pip install pandas
+pip install matplotlib
+```
+
+## Test steps:
 
 1. set environment
 
@@ -16,6 +27,10 @@ ros2 launch wms_navigation wms_gazebo.launch.py
 3. launch navigation with slam
 ```sh
 ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True
+```
+_OR_
+```sh
+ros2 launch wms_navigation wms_slam.launch.py sim:=True rviz:=True gridmap:=True
 ```
 
 4. save the map

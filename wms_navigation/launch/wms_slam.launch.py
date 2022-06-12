@@ -53,7 +53,11 @@ def generate_launch_description():
             default_value='false',
             description='Run rviz'
         ),
-
+        DeclareLaunchArgument(
+            name='gridmap', 
+            default_value='false',
+            description='Retrieve gridmap from SlamToolbox'
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(slam_launch_path),
             launch_arguments={
@@ -70,5 +74,16 @@ def generate_launch_description():
             arguments=['-d', rviz_config_path],
             condition=IfCondition(LaunchConfiguration("rviz")),
             parameters=[{'use_sim_time': LaunchConfiguration("sim")}]
+        ),
+        Node(
+            condition=IfCondition(LaunchConfiguration("gridmap")),
+            package='wms_navigation',
+            executable='slam_subscriber.py',
+            name='slam_subscriber',
+            # equals to: launch_arguments = {'params_file': params_file}.items(),
+            parameters = [PathJoinSubstitution(
+                [FindPackageShare('wms_navigation'), 'config', 'slam_subscriber.yaml']
+            )],
+            output='screen'
         )
     ])

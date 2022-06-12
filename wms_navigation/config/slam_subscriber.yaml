@@ -1,0 +1,21 @@
+
+# to list from command: `ros2 param dump /slam_subscriber --print`
+slam_subscriber:  # /slam_subscriber or slam_subscriber are both acceptable
+  ros__parameters:
+    candidates_per_axis: 100
+    step_of_candidates: 0.2
+    map_topic: 'map'
+    odom_topic: 'odom'
+
+    # int_array:
+    # - 10
+    # - 11
+    # str_array:
+    # - 'str1'
+    # - 'str2'
+
+    # nested_param:
+    #   another_byte_array:
+    #   - 0x0A
+    #   - 0x0B
+    #   another_int: 101
