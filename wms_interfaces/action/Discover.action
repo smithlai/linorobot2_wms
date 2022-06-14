@@ -1,0 +1,8 @@
+
+#Threshold to consider the map completed
+float32 map_completed_thres
+---
+bool result
+---
+#Percentage of the map explored
+float32 progress
