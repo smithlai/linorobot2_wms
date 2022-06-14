@@ -2,7 +2,7 @@
 # to list from command: `ros2 param dump /slam_subscriber --print`
 slam_subscriber:  # /slam_subscriber or slam_subscriber are both acceptable
   ros__parameters:
-    candidates_per_axis: 100
+    candidates_per_axis: 101
     step_of_candidates: 0.2
     map_topic: 'map'
     odom_topic: 'odom'

@@ -47,7 +47,8 @@ class SlamToolboxSubscriber(Node):
         candidates_per_axis = self.get_parameter('candidates_per_axis').value
         step_of_candidates = self.get_parameter('step_of_candidates').value
         self.robot_position = None
-        # create a 100*100 map, each point increased by 0.2m,  that is (0.0,0.2,0.4...19.8)
+        # create a 100*100 map, each axis coordinate increased by 0.2m, that is [0.0,0.2,0.4...19.8] 
+        # ([(x1,y1),(x2,y2)......])
         self.nearby_candidates = self.generate_list_of_candidates(candidates_per_axis=candidates_per_axis, step=step_of_candidates)
         self.sorted_accessible_candidates = np.array([])
 
@@ -83,9 +84,9 @@ class SlamToolboxSubscriber(Node):
         # https://stackoverflow.com/questions/28269157/plotting-in-a-non-blocking-way-with-matplotlib
         cmap = 'gray_r'
         origin='lower'
-        plt.figimage(image, cmap=cmap, origin=origin)
-        plt.draw()
-        plt.pause(0.2)
+        # plt.figimage(image, cmap=cmap, origin=origin)
+        # plt.draw()
+        # plt.pause(0.2)
 
 
         if not self.robot_position:
@@ -93,17 +94,17 @@ class SlamToolboxSubscriber(Node):
         else:
             # Here we go through every candidate and save the ones that are accessible.
             # An accessible candidate is one which has no obstacles, and has few or no unknown squares in the vicinity.
-            accessible_candidates = np.array([], dtype=np.int32)
+            accessible_candidates = np.array([], dtype=np.int32) #([(x1,y1),(x2,y2)......])
             occupancy_value = np.array([])
-            for candidate in self.nearby_candidates:
+            for candidate in self.nearby_candidates: #([(x1,y1),(x2,y2)......])
                 try:
-                    occupancy_grid_coordinates = [int(candidate[1] / resolution) + robot_position_y, int(candidate[0] / resolution)+robot_position_x]
-                    conv_accessable, conv_avg= self.convolute(data, occupancy_grid_coordinates, size=9, threshold=40)  # perform convolution
+                    occupancy_grid_coordinate = [int(candidate[0] / resolution) + robot_position_x, int(candidate[1] / resolution)+robot_position_y]
+                    conv_accessable, conv_avg= self.convolute(data, occupancy_grid_coordinate, size=9, threshold=40)  # perform convolution
 
                     # if the convolution returns True, it means the WP is accessible (under threshold), 
                     # so it is stored in accessible_candidates
                     if conv_accessable:
-                        accessible_candidates = np.append(accessible_candidates, occupancy_grid_coordinates)
+                        accessible_candidates = np.append(accessible_candidates, occupancy_grid_coordinate)
                         occupancy_value = np.append(occupancy_value, conv_avg)
                     else:
                         pass
@@ -111,7 +112,7 @@ class SlamToolboxSubscriber(Node):
                 except IndexError:
                     pass
             # reshape the accessible candidates array to shape (n, 2)
-            accessible_candidates = accessible_candidates.reshape((-1, 2))
+            accessible_candidates = accessible_candidates.reshape((-1, 2))  #([(x1,y1),(x2,y2)......])
             # Sorting candidates according to occupancy value. This allows the robot to prioritize the candidates with
             # more uncertainty (it wont access the areas that are completely clear, thus going to the discovery frontier)
             # [::-1] reverses the array
@@ -122,17 +123,16 @@ class SlamToolboxSubscriber(Node):
 
             # At the beginning, when all values are uncertain, we add some hardcoded candidates so it begins to navigate
             # and has time to discover accessible areas
-            if np.size(self.sorted_accessible_candidates) == 0:
-                self.sorted_accessible_candidates = np.array([[1.5, 0.0], [0.0, 1.5], [-1.5, 0.0], [0.0, -1.5]])
+            # if np.size(self.sorted_accessible_candidates) == 0:
+            #     self.sorted_accessible_candidates = np.array([[1.5, 0.0], [0.0, 1.5], [-1.5, 0.0], [0.0, -1.5]])
 
             for i in range(self.sorted_accessible_candidates.shape[0]):
                 candidate = self.sorted_accessible_candidates[i]
-                image[candidate[1],candidate[0]] = sorted_occupancy_value[i]*2
-                self.get_logger().info(f'{candidate}, {sorted_occupancy_value[i]*2}')
+                image[candidate[1],candidate[0]] = 100  #sorted_occupancy_value[i]*2
 
             plt.figimage(image, cmap=cmap, origin=origin)
             plt.draw()
-            plt.pause(0.2)
+            plt.pause(0.1)
             # Once we have the new candidates, 
             # they are saved in self.sorted_accessible_candidates for use by the Navigator client
             self.get_logger().info('Accessible candidates have been updated...')
@@ -150,15 +150,15 @@ class SlamToolboxSubscriber(Node):
         around said point.
 
         :param data: Occupancy Grid Data (shaped to (x, y) map dimensions)
-        :param coordinates: the coordinates of the OccupancyGrid to convolute around
+        :param coordinate: the coordinate (x,y) of the OccupancyGrid to convolute around 
         :param size: size of the kernel
         :param threshold: threshold of accessibility
         :return: True or False, depending on whether the candidate is accessible or not.
         :return: average: average occupancy probability of the convolution
         """
         sum = 0
-        for y in range(int(coordinates[0] - size / 2), int(coordinates[0] + size / 2)):
-            for x in range(int(coordinates[1] - size / 2), int(coordinates[1] + size / 2)):
+        for y in range(int(coordinates[1] - size / 2), int(coordinates[1] + size / 2)):
+            for x in range(int(coordinates[0] - size / 2), int(coordinates[0] + size / 2)):
                 # if the area is unknown, we add 100 to sum.
                 if data[y, x] == -1:
                     sum += 100
@@ -166,6 +166,8 @@ class SlamToolboxSubscriber(Node):
                 # access areas near walls.
                 elif data[y, x] > 50:
                     sum += 1000000
+                elif data[y, x] == 0:
+                    sum += (abs(x) + abs(y))*0.01
                 # if the occupancy state is below 50 and known, just add the value to sum.
                 else:
                     sum += data[y, x]
@@ -187,18 +189,20 @@ class SlamToolboxSubscriber(Node):
         :param candidates_per_axis: number of total candidates to generate per side
         :param step: float resolution of the candidates
         :return candidates: 2D numpy array of a list of coordinates of size dim x 2,
-        where dim is the number of candidates
+        where dim is the number of candidates [x1,y1,x2,y2......]
         """
 
         candidates = np.zeros((candidates_per_axis * candidates_per_axis, 2))
 
         i = 0
+        edge = candidates_per_axis * step
+        center_shift = edge/2
         for index_y in range(candidates_per_axis):
             for index_x in range(candidates_per_axis):
-                candidates[i] = [float(index_x) / (1/step), float(index_y) / (1/step)]
+                candidates[i] = [float(index_x) * step - center_shift, float(index_y)*step - center_shift]
                 i += 1
 
-        self.get_logger().info(f"Grid of candidates has been generated. {i}")
+        self.get_logger().info(f"Grid of {i} candidates has been generated.")
         return candidates
 
 def main(args=None):
