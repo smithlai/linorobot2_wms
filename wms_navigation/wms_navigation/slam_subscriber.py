@@ -43,7 +43,7 @@ class SlamToolboxSubscriber(Node):
         odom_topic = self.get_parameter('odom_topic').value
         self.occupancy_subscription = self.create_subscription(OccupancyGrid, map_topic, self.occupancy_callback, 10)
         self.odom_subscription = self.create_subscription(Odometry, odom_topic, self.odom_callback, 10)
-
+        self.busy_occupancy_callback = False
         candidates_per_axis = self.get_parameter('candidates_per_axis').value
         step_of_candidates = self.get_parameter('step_of_candidates').value
         self.robot_position = None
@@ -51,6 +51,7 @@ class SlamToolboxSubscriber(Node):
         # ([(x1,y1),(x2,y2)......])
         self.nearby_candidates = self.generate_list_of_candidates(candidates_per_axis=candidates_per_axis, step=step_of_candidates)
         self.sorted_accessible_candidates = np.array([])
+        self.fig = plt.figure()
 
     def occupancy_callback(self, msg):
         """
@@ -61,7 +62,9 @@ class SlamToolboxSubscriber(Node):
         :param msg: OccupancyGrid message. Includes map metadata and an array with the occupancy probability values
         :return: None
         """
-
+        if self.busy_occupancy_callback:
+            return
+        self.busy_occupancy_callback=True
         data = np.array(msg.data)  # download the occupancy grid
         current_map_width = msg.info.width  # get the current map width
         current_map_height = msg.info.height  # get the current map height
@@ -82,12 +85,6 @@ class SlamToolboxSubscriber(Node):
         #             self.get_logger().info(f"{image[j,i]}")
 
         # https://stackoverflow.com/questions/28269157/plotting-in-a-non-blocking-way-with-matplotlib
-        cmap = 'gray_r'
-        origin='lower'
-        # plt.figimage(image, cmap=cmap, origin=origin)
-        # plt.draw()
-        # plt.pause(0.2)
-
 
         if not self.robot_position:
             pass
@@ -98,7 +95,11 @@ class SlamToolboxSubscriber(Node):
             occupancy_value = np.array([])
             for candidate in self.nearby_candidates: #([(x1,y1),(x2,y2)......])
                 try:
-                    occupancy_grid_coordinate = [int(candidate[0] / resolution) + robot_position_x, int(candidate[1] / resolution)+robot_position_y]
+                    x = int(candidate[0] / resolution) + robot_position_x
+                    y = int(candidate[1] / resolution) + robot_position_y
+                    if x < 0 or y < 0:
+                        continue
+                    occupancy_grid_coordinate = [x, y]
                     conv_accessable, conv_avg= self.convolute(data, occupancy_grid_coordinate, size=9, threshold=40)  # perform convolution
 
                     # if the convolution returns True, it means the WP is accessible (under threshold), 
@@ -130,12 +131,16 @@ class SlamToolboxSubscriber(Node):
                 candidate = self.sorted_accessible_candidates[i]
                 image[candidate[1],candidate[0]] = 100  #sorted_occupancy_value[i]*2
 
+            cmap = 'gray_r'
+            origin='lower'
             plt.figimage(image, cmap=cmap, origin=origin)
-            plt.draw()
-            plt.pause(0.1)
+            self.fig.canvas.draw()
+            plt.pause(0.01)
             # Once we have the new candidates, 
             # they are saved in self.sorted_accessible_candidates for use by the Navigator client
             self.get_logger().info('Accessible candidates have been updated...')
+        
+        self.busy_occupancy_callback=False
 
     def odom_callback(self, msg):      
         pose = msg.pose.pose
@@ -166,8 +171,8 @@ class SlamToolboxSubscriber(Node):
                 # access areas near walls.
                 elif data[y, x] > 50:
                     sum += 1000000
-                elif data[y, x] == 0:
-                    sum += (abs(x) + abs(y))*0.01
+                # elif data[y, x] == 0:
+                #     sum += (abs(x) + abs(y))*0.01
                 # if the occupancy state is below 50 and known, just add the value to sum.
                 else:
                     sum += data[y, x]
