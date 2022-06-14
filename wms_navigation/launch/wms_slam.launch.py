@@ -78,11 +78,11 @@ def generate_launch_description():
         Node(
             condition=IfCondition(LaunchConfiguration("gridmap")),
             package='wms_navigation',
-            executable='slam_subscriber.py',
-            name='slam_subscriber',
+            executable='map_analyzer.py',
+            name='map_analyzer',
             # equals to: launch_arguments = {'params_file': params_file}.items(),
             parameters = [
-                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'slam_subscriber.yaml']),
+                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
                 {'use_sim_time': LaunchConfiguration("sim")}
             ],
             

@@ -28,9 +28,9 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 import numpy as np
 import matplotlib.pyplot as plt
 
-class SlamToolboxSubscriber(Node):
+class MapAnalyzer(Node):
     def __init__(self):
-        super().__init__('slamtoolbox_subscriber')
+        super().__init__('map_analyzer')
         self.declare_parameters(
             namespace='',
             parameters=[
@@ -213,9 +213,9 @@ class SlamToolboxSubscriber(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    slamToolboxSubscriber = SlamToolboxSubscriber()
+    map_analyzer = MapAnalyzer()
 
-    rclpy.spin(slamToolboxSubscriber)
+    rclpy.spin(map_analyzer)
 
     node.destroy_node()
     rclpy.shutdown()
