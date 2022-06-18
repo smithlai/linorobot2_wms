@@ -21,12 +21,11 @@ import rclpy
 from rclpy.node import Node
 
 # messages
-from std_msgs.msg import Float32
 from nav_msgs.msg import OccupancyGrid, Odometry
-
+from geometry_msgs.msg import Point, Pose, PoseArray
 # 3rd party
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 class MapAnalyzer(Node):
     def __init__(self):
@@ -36,13 +35,19 @@ class MapAnalyzer(Node):
             parameters=[
                 ('candidates_per_axis', 40),
                 ('step_of_candidates', 0.5),
-                ('map_topic', 'map1'),
-                ('odom_topic', 'odom1')
+                ('map_topic', 'map'),
+                ('odom_topic', 'odom'),
+                ('local_candidate_topic', 'local_candidate_topic')
             ])
         map_topic = self.get_parameter('map_topic').value
         odom_topic = self.get_parameter('odom_topic').value
+        local_candidate_topic = self.get_parameter('local_candidate_topic').value
         self.occupancy_subscription = self.create_subscription(OccupancyGrid, map_topic, self.occupancy_callback, 10)
         self.odom_subscription = self.create_subscription(Odometry, odom_topic, self.odom_callback, 10)
+        self.my_local_candidates_publisher = self.create_publisher(
+            PoseArray, 
+            f'/{local_candidate_topic}', 
+            1)
         self.busy_occupancy_callback = False
         candidates_per_axis = self.get_parameter('candidates_per_axis').value
         step_of_candidates = self.get_parameter('step_of_candidates').value
@@ -51,7 +56,7 @@ class MapAnalyzer(Node):
         # ([(x1,y1),(x2,y2)......])
         self.nearby_candidates = self.generate_list_of_candidates(candidates_per_axis=candidates_per_axis, step=step_of_candidates)
         self.sorted_accessible_candidates = np.array([])
-        self.fig = plt.figure()
+        # self.fig = plt.figure()
 
     def occupancy_callback(self, msg):
         """
@@ -131,22 +136,37 @@ class MapAnalyzer(Node):
                 candidate = self.sorted_accessible_candidates[i]
                 image[candidate[1],candidate[0]] = 100  #sorted_occupancy_value[i]*2
 
-            cmap = 'gray_r'
-            origin='lower'
-            plt.figimage(image, cmap=cmap, origin=origin)
-            self.fig.canvas.draw()
-            plt.pause(0.01)
+            # cmap = 'gray_r'
+            # origin='lower'
+            # plt.figimage(image, cmap=cmap, origin=origin)
+            # self.fig.canvas.draw()
+            # plt.pause(0.01)
             # Once we have the new candidates, 
             # they are saved in self.sorted_accessible_candidates for use by the Navigator client
-            self.get_logger().info('Accessible candidates have been updated...')
-        
+            # self.get_logger().info('Accessible candidates have been updated...')
+
+            # To robot coordination
+            msg = PoseArray()
+            for i in range(self.sorted_accessible_candidates.shape[0]):
+                candidate = self.sorted_accessible_candidates[i]
+                new_position_x = candidate[0] * resolution + shiftX
+                new_position_y = candidate[1] * resolution + shiftY
+                new_p = Pose()
+                new_p.position.x = new_position_x
+                new_p.position.x = new_position_y
+                # new_p.position.z = 0.0
+                msg.poses.append(new_p) 
+            self.my_local_candidates_publisher.publish(msg)
+        # import time
+        # time.sleep(3)
         self.busy_occupancy_callback=False
 
     def odom_callback(self, msg):      
         pose = msg.pose.pose
         position = pose.position
         # orientation = pose.orientation
-        self.robot_position = position        
+        self.robot_position = position
+        # self.get_logger().info(f'self.robot_position={self.robot_position}')  
 
     @staticmethod
     def convolute(data, coordinates, size=3, threshold=40):
@@ -217,7 +237,7 @@ def main(args=None):
 
     rclpy.spin(map_analyzer)
 
-    node.destroy_node()
+    map_analyzer.destroy_node()
     rclpy.shutdown()
 
 

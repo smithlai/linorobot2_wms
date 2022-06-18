@@ -16,6 +16,7 @@ import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import PythonExpression
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition
 from launch_ros.substitutions import FindPackageShare
@@ -69,17 +70,20 @@ def generate_launch_description():
             default_value=default_map_path,
             description='Navigation map path'
         ),
-
+        DeclareLaunchArgument(
+            name='auto_slam', 
+            default_value='False',
+            description='Autonomous Slam according to SlamToolbox and Nav2'
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(nav2_launch_path),
             launch_arguments={
-                'slam': LaunchConfiguration("slam"),
+                'slam': LaunchConfiguration("slam"), # slam will eliminate map server (default_map_path)
                 'map': LaunchConfiguration("map"),
                 'use_sim_time': LaunchConfiguration("sim"),
                 'params_file': nav2_config_path
             }.items()
         ),
-
         Node(
             package='rviz2',
             executable='rviz2',
@@ -88,5 +92,32 @@ def generate_launch_description():
             arguments=['-d', rviz_config_path],
             condition=IfCondition(LaunchConfiguration("rviz")),
             parameters=[{'use_sim_time': LaunchConfiguration("sim")}]
+        ),
+        Node(
+            # condition=IfCondition(LaunchConfiguration("auto_slam")),
+            condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("auto_slam")])),
+            package='wms_navigation',
+            executable='map_analyzer.py',
+            name='map_analyzer',
+            # equals to: launch_arguments = {'params_file': params_file}.items(),
+            parameters = [
+                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
+                # {'use_sim_time': LaunchConfiguration("sim")}
+            ],
+            
+            output='screen'
+        ),
+        Node(
+            # condition=IfCondition(LaunchConfiguration("auto_slam")),
+            condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("auto_slam")])),
+            package='wms_navigation',
+            executable='discovery_server.py',
+            name='discovery_server',
+            # equals to: launch_arguments = {'params_file': params_file}.items(),
+            parameters = [
+                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
+                # {'use_sim_time': LaunchConfiguration("sim")}
+            ],
+            output='screen'
         )
     ])

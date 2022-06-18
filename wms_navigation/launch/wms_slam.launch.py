@@ -54,9 +54,9 @@ def generate_launch_description():
             description='Run rviz'
         ),
         DeclareLaunchArgument(
-            name='gridmap', 
+            name='auto_slam', 
             default_value='false',
-            description='Retrieve gridmap from SlamToolbox'
+            description='Retrieve auto_slam from SlamToolbox'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(slam_launch_path),
@@ -76,16 +76,29 @@ def generate_launch_description():
             parameters=[{'use_sim_time': LaunchConfiguration("sim")}]
         ),
         Node(
-            condition=IfCondition(LaunchConfiguration("gridmap")),
+            condition=IfCondition(LaunchConfiguration("auto_slam")),
             package='wms_navigation',
             executable='map_analyzer.py',
             name='map_analyzer',
             # equals to: launch_arguments = {'params_file': params_file}.items(),
             parameters = [
                 PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
-                {'use_sim_time': LaunchConfiguration("sim")}
+                # {'use_sim_time': LaunchConfiguration("sim")}
             ],
             
             output='screen'
         )
+        # ,
+        # Node(
+        #     condition=IfCondition(LaunchConfiguration("auto_slam")),
+        #     package='wms_navigation',
+        #     executable='discovery_server.py',
+        #     name='discovery_server',
+        #     # equals to: launch_arguments = {'params_file': params_file}.items(),
+        #     parameters = [
+        #         PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
+        #         # {'use_sim_time': LaunchConfiguration("sim")}
+        #     ],
+        #     output='screen'
+        # )
     ])

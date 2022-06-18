@@ -25,12 +25,15 @@ ros2 launch wms_navigation wms_gazebo.launch.py
 ```
 
 3. launch navigation with slam
+> Manual  
 ```sh
 ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True
 ```
-_OR_
+_OR_  
+> Autonomous  
 ```sh
-ros2 launch wms_navigation wms_slam.launch.py sim:=True rviz:=True gridmap:=True
+ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True auto_slam:=True
+ros2 action send_goal /discover wms_interfaces/action/Discover "{map_completed_thres : 0.0}"
 ```
 
 4. save the map

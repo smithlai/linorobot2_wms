@@ -47,6 +47,7 @@ ament_python_install_package(${PROJECT_NAME})
 # on Node(package=package_name, executable='map_to_base_link_transform.py')
 install(PROGRAMS
   ${PROJECT_NAME}/map_analyzer.py
+  ${PROJECT_NAME}/discovery_server.py
   scripts/robot_navigator.py
   scripts/waypoint_follower_tst.py
   DESTINATION lib/${PROJECT_NAME}
