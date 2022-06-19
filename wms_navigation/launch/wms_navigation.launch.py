@@ -101,8 +101,9 @@ def generate_launch_description():
             name='map_analyzer',
             # equals to: launch_arguments = {'params_file': params_file}.items(),
             parameters = [
-                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
-                # {'use_sim_time': LaunchConfiguration("sim")}
+                {'use_sim_time': LaunchConfiguration("sim")},
+                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml'])
+                
             ],
             
             output='screen'
@@ -115,8 +116,8 @@ def generate_launch_description():
             name='discovery_server',
             # equals to: launch_arguments = {'params_file': params_file}.items(),
             parameters = [
+                {'use_sim_time': LaunchConfiguration("sim")},
                 PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
-                # {'use_sim_time': LaunchConfiguration("sim")}
             ],
             output='screen'
         )

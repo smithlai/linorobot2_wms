@@ -2,8 +2,8 @@
 # to list from command: `ros2 param dump /map_analyzer --print`
 map_analyzer:  # /map_analyzer or map_analyzer are both acceptable
   ros__parameters:
-    candidates_per_axis: 101
-    step_of_candidates: 0.5
+    candidates_radius_num: 100
+    candidates_pixel_step: 1
     map_topic: 'map'
     odom_topic: 'odom'
     use_sim_time: True

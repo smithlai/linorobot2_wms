@@ -6,7 +6,8 @@
 import numpy as np
 import pandas as pd
 import os
-import csv
+# import csv
+# import time
 # from ament_index_python.packages import get_package_share_directory
 
 # ros
@@ -52,7 +53,7 @@ class DiscovererServer(Node):
 
         # Describe candidate data
         local_candidate_topic = self.get_parameter('local_candidate_topic').value
-        self.sorted_accessible_candidates = []
+        self.sorted_local_candidates = []
         self.local_candidate_subscriber = self.create_subscription(PoseArray, local_candidate_topic, self.local_candidate_callback, 10, callback_group=self.group2)
 
         # Register Nav client
@@ -64,9 +65,9 @@ class DiscovererServer(Node):
         self.get_logger().info("Discoverer Server is ready")
 
     def local_candidate_callback(self, msg):   
-        # self.get_logger().info("sorted_accessible_candidates UPDATED")   
+        # self.get_logger().info("sorted_local_candidates UPDATED")   
         poses = msg.poses
-        self.sorted_accessible_candidates = poses
+        self.sorted_local_candidates = poses
             
     def execute_callback(self, goal_handle):
         self.get_logger().info("Discoverer Server received a goal")
@@ -74,6 +75,7 @@ class DiscovererServer(Node):
         self.get_logger().info("Map completed threshold set to: %s" %self.map_completed_thres)
         while not self.stop_discovering:
             self.send_goal()
+            self.get_logger().warning('self.send_goal() done')
 
         self.get_logger().info('Discovering Finished')
         goal_handle.succeed()
@@ -105,14 +107,19 @@ class DiscovererServer(Node):
 
     def create_goal(self):
         # create goal command
-        # pop first element from the list, in case the sorted_accessible_candidates didn't refresh
-        next_candidate = self.sorted_accessible_candidates.pop(0)
+        # pop first element from the list, in case the sorted_local_candidates didn't refresh
+        goal_msg=None
+        try:
+            next_candidate = self.sorted_local_candidates.pop(0)
+            self.get_logger().warning('new goal = {next_candidate.x},{next_candidate.y}')
+            map_topic = self.get_parameter('map_topic').value
+            goal_msg = NavigateToPose.Goal()
+            goal_msg.pose.header.frame_id = map_topic
+            goal_msg.pose.pose = next_candidate
+            # goal_msg.pose.pose.orientation.w = 1.0 # default
+        except Exception as e:
+            self.get_logger().info('Error while pop sorted_local_candidates')
 
-        map_topic = self.get_parameter('map_topic').value
-        goal_msg = NavigateToPose.Goal()
-        goal_msg.pose.header.frame_id = map_topic
-        goal_msg.pose.pose = next_candidate
-        # goal_msg.pose.pose.orientation.w = 1.0 # default
         return goal_msg
 
     def send_goal(self):
@@ -120,11 +127,11 @@ class DiscovererServer(Node):
         self.get_logger().info('Waiting for Navigation server...start')
         self._action_client.wait_for_server()
         self.get_logger().info('Waiting for Navigation server...done')
-        if len(self.sorted_accessible_candidates) == 0:
-            self.get_logger().info('No sorted_accessible_candidates available.')
-            return
 
         goal_msg = self.create_goal()
+        if goal_msg is None:
+            self.get_logger().warning('No sorted_local_candidates available.')
+            return
 
         # Send goal and wait
         self._send_goal_future = self._action_client.send_goal_async(goal_msg)
