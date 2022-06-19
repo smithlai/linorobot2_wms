@@ -54,7 +54,7 @@ class DiscovererServer(Node):
         # Describe candidate data
         local_candidate_topic = self.get_parameter('local_candidate_topic').value
         self.sorted_local_candidates = []
-        self.local_candidate_subscriber = self.create_subscription(PoseArray, local_candidate_topic, self.local_candidate_callback, 10, callback_group=self.group2)
+        self.local_candidate_subscriber = self.create_subscription(PoseArray, local_candidate_topic, self.local_candidate_callback, 1, callback_group=self.group2)
 
         # Register Nav client
         self._action_client = ActionClient(self, NavigateToPose, 'navigate_to_pose', callback_group=self.group3)
@@ -65,9 +65,10 @@ class DiscovererServer(Node):
         self.get_logger().info("Discoverer Server is ready")
 
     def local_candidate_callback(self, msg):   
-        # self.get_logger().info("sorted_local_candidates UPDATED")   
+
         poses = msg.poses
         self.sorted_local_candidates = poses
+        # self.get_logger().info(f"sorted_local_candidates UPDATED: {len(self.sorted_local_candidates)}")   
             
     def execute_callback(self, goal_handle):
         self.get_logger().info("Discoverer Server received a goal")
@@ -111,14 +112,14 @@ class DiscovererServer(Node):
         goal_msg=None
         try:
             next_candidate = self.sorted_local_candidates.pop(0)
-            self.get_logger().warning('new goal = {next_candidate.x},{next_candidate.y}')
+            self.get_logger().warning(f'new goal = {next_candidate.position.x},{next_candidate.position.y}')
             map_topic = self.get_parameter('map_topic').value
             goal_msg = NavigateToPose.Goal()
             goal_msg.pose.header.frame_id = map_topic
             goal_msg.pose.pose = next_candidate
             # goal_msg.pose.pose.orientation.w = 1.0 # default
         except Exception as e:
-            self.get_logger().info('Error while pop sorted_local_candidates')
+            self.get_logger().warning(f'Error while pop sorted_local_candidates:{e}')
 
         return goal_msg
 
@@ -130,7 +131,7 @@ class DiscovererServer(Node):
 
         goal_msg = self.create_goal()
         if goal_msg is None:
-            self.get_logger().warning('No sorted_local_candidates available.')
+            # self.get_logger().warning('No sorted_local_candidates available.')
             return
 
         # Send goal and wait

@@ -35,6 +35,7 @@ class MapAnalyzer(Node):
             parameters=[
                 ('candidates_radius_num', 40),
                 ('candidates_pixel_step', 1),
+                ('convolution_size', 3),
                 ('map_topic', 'map'),
                 ('odom_topic', 'odom'),
                 ('local_candidate_topic', 'local_candidate_topic')
@@ -101,12 +102,13 @@ class MapAnalyzer(Node):
             occupancy_value = np.array([])
             for candidate in self.nearby_candidates: #([(x1,y1),(x2,y2)......])
                 try:
-                    x = round(candidate[0] / resolution) + robot_position_x
-                    y = round(candidate[1] / resolution) + robot_position_y
+                    x = round(candidate[0]) + robot_position_x
+                    y = round(candidate[1]) + robot_position_y
                     if x < 0 or y < 0:
                         continue
                     occupancy_grid_coordinate = [x, y]
-                    conv_accessable, worth = self.convolute(data, occupancy_grid_coordinate, size=9)  # perform convolution
+                    convolution_size = self.get_parameter('convolution_size').value
+                    conv_accessable, worth = self.convolute(data, occupancy_grid_coordinate, size=convolution_size)  # perform convolution
 
                     # if the convolution returns True, it means the WP is accessible (under threshold), 
                     # so it is stored in local_accessible_candidates
@@ -157,7 +159,7 @@ class MapAnalyzer(Node):
             # To robot coordination
             # self.get_logger().info(f"-----------------------------")
             msg = PoseArray()
-            for i in range(min(self.sorted_accessible_local_candidates.shape[0], 100)):
+            for i in range(min(self.sorted_accessible_local_candidates.shape[0], 5)):
                 candidate = self.sorted_accessible_local_candidates[i]
                 new_position_x = candidate[0] * resolution + shiftX
                 new_position_y = candidate[1] * resolution + shiftY
@@ -197,29 +199,27 @@ class MapAnalyzer(Node):
         :return: worth: The worth level
         """
         worth = 0
-        multi = size*size
-        adjacentKnown = False
+        isKnownCenter = False
         adjacentWall = False
-        for y in range(round(coordinates[1] - size / 2), round(coordinates[1] + size / 2)):
-            for x in range(round(coordinates[0] - size / 2), round(coordinates[0] + size / 2)):
-                # if the area is unknown, we add 100 to worth.
-                if data[y, x] == -1:
-                    worth += 100
-                # access areas near walls.
-                elif data[y, x] > 50:
-                    adjacentWall = True
-                    worth += 0
-                    break
-                # elif data[y, x] == 0:
-                #     worth += (abs(x) + abs(y))*0.01
-                # if the occupancy state is below 50 and known, just add the value to worth.
-                else:
-                    adjacentKnown=True
-                    worth += 1 # data[y, x]
+        centerOccupied = data[coordinates[1], coordinates[0]]
+        if centerOccupied >= 0 and centerOccupied <= 10:
+            isKnownCenter = True
 
-        # average value for the square is computed
-        # average = worth / multi
-        if worth > 0 and adjacentKnown and not adjacentWall:
+        if isKnownCenter:
+            for y in range(round(coordinates[1] - size / 2), round(coordinates[1] + size / 2)):
+                for x in range(round(coordinates[0] - size / 2), round(coordinates[0] + size / 2)):
+                    # if the area is unknown, we add 100 to worth.
+                    if data[y, x] == -1:
+                        worth += 100
+                    # access areas near walls.
+                    elif data[y, x] > 50:
+                        adjacentWall = True
+                        worth += 0
+                        break
+                    else:
+                        worth += 1 if worth > 0 else 0
+
+        if worth > 0 and isKnownCenter and not adjacentWall:
             return True, worth
         else:
             return False, worth
@@ -245,7 +245,7 @@ class MapAnalyzer(Node):
                 candidates[i] = [float(index_x) * step - radius, float(index_y)*step - radius]
                 i += 1
 
-        self.get_logger().info(f"Grid of {i} candidates has been generated.")
+        self.get_logger().info(f"Grid of {i} candidates has been generated. step={step}")
         return candidates
 
 def main(args=None):
