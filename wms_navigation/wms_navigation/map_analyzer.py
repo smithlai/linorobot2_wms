@@ -159,7 +159,7 @@ class MapAnalyzer(Node):
             # To robot coordination
             # self.get_logger().info(f"-----------------------------")
             msg = PoseArray()
-            for i in range(min(self.sorted_accessible_local_candidates.shape[0], 5)):
+            for i in range(min(self.sorted_accessible_local_candidates.shape[0], 10)):
                 candidate = self.sorted_accessible_local_candidates[i]
                 new_position_x = candidate[0] * resolution + shiftX
                 new_position_y = candidate[1] * resolution + shiftY
