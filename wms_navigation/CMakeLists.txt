@@ -49,6 +49,7 @@ install(PROGRAMS
   ${PROJECT_NAME}/map_analyzer.py
   ${PROJECT_NAME}/discovery_server.py
   scripts/robot_navigator.py
+  scripts/robot_navigator_tst.py
   scripts/waypoint_follower_tst.py
   DESTINATION lib/${PROJECT_NAME}
 )
