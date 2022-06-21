@@ -29,7 +29,7 @@ from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
 
 from wms_interfaces.action import Discover
-
+import time
 
 # ros2 action send_goal wander explorer_interfaces/action/Wander "{strategy: 1, map_completed_thres: 0.6}"
 
@@ -61,26 +61,32 @@ class DiscovererServer(Node):
 
         # Global variables
         self.stop_discovering = False
+        self.navigating = False
         self.map_completed_thres=1.0 #Initialize threshold to max (100%)
         self.get_logger().info("Discoverer Server is ready")
 
-    def local_candidate_callback(self, msg):   
+    def local_candidate_callback(self, msg):
 
         poses = msg.poses
         self.sorted_local_candidates = poses
-        # self.get_logger().info(f"sorted_local_candidates UPDATED: {len(self.sorted_local_candidates)}")   
+        self.get_logger().info(f"sorted_local_candidates UPDATED: {len(self.sorted_local_candidates)}")   
+
+
             
     def execute_callback(self, goal_handle):
         self.get_logger().info("Discoverer Server received a goal")
-        self.map_completed_thres=goal_handle.request.map_completed_thres
-        self.get_logger().info("Map completed threshold set to: %s" %self.map_completed_thres)
+        # self.map_completed_thres=goal_handle.request.map_completed_thres
+        # self.get_logger().info("Map completed threshold set to: %s" %self.map_completed_thres)
         while not self.stop_discovering:
             self.send_goal()
-            self.get_logger().warning('self.send_goal() done')
+            # self.get_logger().warning('self.send_goal() done')
 
-        self.get_logger().info('Discovering Finished')
+        self.get_logger().info(f'Discovering Finished')
+
         goal_handle.succeed()
-        return Discover.Result()
+        result = Discover.Result()
+        result.result = True
+        return result
 
     """
     send_goal -> goal_response_callback -> get_result_callback
@@ -88,14 +94,15 @@ class DiscovererServer(Node):
     def goal_response_callback(self, future):
         goal_handle = future.result()
         if not goal_handle.accepted:
-            self.stop_discovering = True
+            # self.stop_discovering = True
             self.get_logger().info('Exploration goal rejected')
+            self.navigating = False
             return
 
         self.get_logger().info('Navigation goal accepted')
 
-        self._get_result_future = goal_handle.get_result_async()
-        self._get_result_future.add_done_callback(self.get_result_callback)
+        _get_result_future = goal_handle.get_result_async()
+        _get_result_future.add_done_callback(self.get_result_callback)
 
     def get_result_callback(self, future):
         result = future.result().result
@@ -103,16 +110,17 @@ class DiscovererServer(Node):
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info('Arrived at destination')
         else:
-            self.stop_discovering = True
+            # self.stop_discovering = True
             self.get_logger().info('Goal failed with status: {0}'.format(status))
+        self.navigating = False
 
-    def create_goal(self):
+    def fetch_goal(self):
         # create goal command
         # pop first element from the list, in case the sorted_local_candidates didn't refresh
         goal_msg=None
         try:
             next_candidate = self.sorted_local_candidates.pop(0)
-            self.get_logger().warning(f'new goal = {next_candidate.position.x},{next_candidate.position.y}')
+            self.get_logger().warning(f'after pop:{len(self.sorted_local_candidates)}. new goal = {next_candidate.position.x},{next_candidate.position.y}')
             map_topic = self.get_parameter('map_topic').value
             goal_msg = NavigateToPose.Goal()
             goal_msg.pose.header.frame_id = map_topic
@@ -125,25 +133,37 @@ class DiscovererServer(Node):
 
     def send_goal(self):
         self.stop_discovering = False
+        if self.navigating:
+            time.sleep(3)
+            return
+        if len(self.sorted_local_candidates) == 0:
+            time.sleep(3)
+            return
+        self.navigating = True  
         self.get_logger().info('Waiting for Navigation server...start')
         self._action_client.wait_for_server()
         self.get_logger().info('Waiting for Navigation server...done')
 
-        goal_msg = self.create_goal()
+        goal_msg = self.fetch_goal()
         if goal_msg is None:
-            # self.get_logger().warning('No sorted_local_candidates available.')
+            self.get_logger().warning('No sorted_local_candidates available.')
+            time.sleep(3)
+            self.navigating = False
             return
 
         # Send goal and wait
-        self._send_goal_future = self._action_client.send_goal_async(goal_msg)
+        _send_goal_future = self._action_client.send_goal_async(goal_msg)
         # check goal accept or reject, if accepted, add self.get_result_callback
-        self._send_goal_future.add_done_callback(self.goal_response_callback)
-        rclpy.spin_until_future_complete(self, self._send_goal_future)
+        _send_goal_future.add_done_callback(self.goal_response_callback)
+        # rclpy.spin_until_future_complete(self, _send_goal_future)
 
+        # !!! These Spins will cause Thread Blocked !!!
         # After complete, request for result
-        goal_handle = self._send_goal_future.result()
-        get_result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, get_result_future)
+        # goal_handle = _send_goal_future.result()
+        # get_result_future = goal_handle.get_result_async()
+        # rclpy.spin_until_future_complete(self, get_result_future)
+
+
 
 def main(args=None):
     rclpy.init(args=args)
