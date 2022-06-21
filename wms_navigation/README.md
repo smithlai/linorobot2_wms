@@ -33,6 +33,9 @@ _OR_
 > Autonomous  
 ```sh
 ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True auto_slam:=True
+
+ros2 launch myautomapping automapping2.launch.py
+or
 ros2 action send_goal /discover wms_interfaces/action/Discover "{map_completed_thres : 0.0}"
 ```
 
