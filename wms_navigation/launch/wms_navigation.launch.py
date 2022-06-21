@@ -21,6 +21,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
+from nav2_common.launch import RewrittenYaml
 
 package_name = 'wms_navigation'
 pkg_share = FindPackageShare(package=package_name).find(package_name)
@@ -45,6 +46,18 @@ def generate_launch_description():
     nav2_config_path = PathJoinSubstitution(
         [pkg_share, 'config', 'navigation.yaml']
     )
+
+    # Make re-written yaml
+    param_substitutions = {
+        # 'use_sim_time': LaunchConfiguration("sim"),
+        'default_nav_to_pose_bt_xml': PathJoinSubstitution([pkg_share, 'config', 'navigate_to_pose_w_replanning_and_recovery.xml'])
+    }
+
+    configured_params = RewrittenYaml(
+        source_file=nav2_config_path,
+        root_key='',
+        param_rewrites=param_substitutions,
+        convert_types=True)
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -81,7 +94,7 @@ def generate_launch_description():
                 'slam': LaunchConfiguration("slam"), # slam will eliminate map server (default_map_path)
                 'map': LaunchConfiguration("map"),
                 'use_sim_time': LaunchConfiguration("sim"),
-                'params_file': nav2_config_path
+                'params_file': configured_params
             }.items()
         ),
         Node(
@@ -102,8 +115,7 @@ def generate_launch_description():
             # equals to: launch_arguments = {'params_file': params_file}.items(),
             parameters = [
                 {'use_sim_time': LaunchConfiguration("sim")},
-                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml'])
-                
+                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml'])                
             ],
             
             output='screen'

@@ -25,8 +25,8 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from geometry_msgs.msg import Point, Pose, PoseArray
 # 3rd party
 import numpy as np
-import matplotlib.pyplot as plt
-# Todo :距離已知點太遠也不行
+# import matplotlib.pyplot as plt
+
 class MapAnalyzer(Node):
     def __init__(self):
         super().__init__('map_analyzer')
@@ -57,7 +57,7 @@ class MapAnalyzer(Node):
         # ([(x1,y1),(x2,y2)......])
         self.nearby_candidates = self.generate_list_of_candidates(candidates_radius_num=candidates_radius_num, step=candidates_pixel_step)
         self.sorted_accessible_local_candidates = np.array([])
-        self.fig = plt.figure()
+        # self.fig = plt.figure()
 
     def occupancy_callback(self, msg):
         """
@@ -69,7 +69,9 @@ class MapAnalyzer(Node):
         :return: None
         """
         if self.busy_occupancy_callback:
+            self.get_logger().info(f"-----------------------------X")
             return
+        self.get_logger().info(f"-----------------------------1")
         self.busy_occupancy_callback=True
         data = np.array(msg.data)  # download the occupancy grid
         current_map_width = msg.info.width  # get the current map width
@@ -79,12 +81,12 @@ class MapAnalyzer(Node):
         shiftY = msg.info.origin.position.y
         # # reshape the data so it resembles the map shape
         data = np.reshape(data, (current_map_height, current_map_width))
-        image = np.where(data<0 , 50 , data)  # make unknown grid gray
+        # image = np.where(data<0 , 50 , data)  # make unknown grid gray
         robot_position_x = robot_position_y = 0
         if self.robot_position:
             robot_position_x = round((self.robot_position.x-shiftX) / resolution)
             robot_position_y = round((self.robot_position.y-shiftY) / resolution)
-            image[robot_position_y-4:robot_position_y+4,robot_position_x-4:robot_position_x+4] = 100
+            # image[robot_position_y-4:robot_position_y+4,robot_position_x-4:robot_position_x+4] = 100
         # for j in range(current_map_height):
         #     for i in range(current_map_width):
         #         if image[j,i] != 0:
@@ -135,31 +137,31 @@ class MapAnalyzer(Node):
             # if np.size(self.sorted_accessible_local_candidates) == 0:
             #     self.sorted_accessible_local_candidates = np.array([[1.5, 0.0], [0.0, 1.5], [-1.5, 0.0], [0.0, -1.5]])
 
-            for i in range(self.sorted_accessible_local_candidates.shape[0]):
-                candidate = self.sorted_accessible_local_candidates[i]
-                if i == 0:
-                    size = 3
-                elif i <= 5:
-                    size = 2
-                elif i <= 10:
-                    size = 1
-                else:
-                    size = 0
-                image[candidate[1]-size:candidate[1]+size,candidate[0]-size:candidate[0]+size] = 100 # + round(sorted_local_occupancy_value[i] * 2) + 20  #sorted_local_occupancy_value[i]*2
+            # for i in range(self.sorted_accessible_local_candidates.shape[0]):
+            #     candidate = self.sorted_accessible_local_candidates[i]
+            #     if i == 0:
+            #         size = 3
+            #     elif i <= 5:
+            #         size = 2
+            #     elif i <= 10:
+            #         size = 1
+            #     else:
+            #         size = 0
+            #     image[candidate[1]-size:candidate[1]+size,candidate[0]-size:candidate[0]+size] = 100 # + round(sorted_local_occupancy_value[i] * 2) + 20  #sorted_local_occupancy_value[i]*2
 
-            cmap = 'gray_r'
-            origin='lower'
-            plt.figimage(image, cmap=cmap, origin=origin)
-            self.fig.canvas.draw()
-            plt.pause(0.01)
+            # cmap = 'gray_r'
+            # origin='lower'
+            # plt.figimage(image, cmap=cmap, origin=origin)
+            # self.fig.canvas.draw()
+            # plt.pause(0.01)
             # Once we have the new candidates, 
             # they are saved in self.sorted_accessible_local_candidates for use by the Navigator client
             # self.get_logger().info('Accessible candidates have been updated...')
 
             # To robot coordination
-            # self.get_logger().info(f"-----------------------------")
+            self.get_logger().info(f"-----------------------------2")
             msg = PoseArray()
-            for i in range(min(self.sorted_accessible_local_candidates.shape[0], 10)):
+            for i in range(min(self.sorted_accessible_local_candidates.shape[0], 1)):
                 candidate = self.sorted_accessible_local_candidates[i]
                 new_position_x = candidate[0] * resolution + shiftX
                 new_position_y = candidate[1] * resolution + shiftY

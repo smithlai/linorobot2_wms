@@ -49,7 +49,7 @@ class DiscovererServer(Node):
         self.group3 = ReentrantCallbackGroup()  # MutuallyExclusiveCallbackGroup()
 
         # This Action server
-        self._action_server = ActionServer(self, Discover, 'discover', self.execute_callback, callback_group=self.group1)
+        # self._action_server = ActionServer(self, Discover, 'discover', self.execute_callback, callback_group=self.group1)
 
         # Describe candidate data
         local_candidate_topic = self.get_parameter('local_candidate_topic').value
@@ -70,24 +70,26 @@ class DiscovererServer(Node):
         poses = msg.poses
         self.sorted_local_candidates = poses
         self.get_logger().info(f"sorted_local_candidates UPDATED: {len(self.sorted_local_candidates)}")   
+        self.navigating = False
+        self.send_goal()
 
 
             
-    def execute_callback(self, goal_handle):
-        self.get_logger().info("Discoverer Server received a goal")
-        # self.map_completed_thres=goal_handle.request.map_completed_thres
-        # self.get_logger().info("Map completed threshold set to: %s" %self.map_completed_thres)
-        self.navigating = False
-        while not self.stop_discovering:
-            self.send_goal()
-            # self.get_logger().warning('self.send_goal() done')
+    # def execute_callback(self, goal_handle):
+    #     self.get_logger().info("Discoverer Server received a goal")
+    #     # self.map_completed_thres=goal_handle.request.map_completed_thres
+    #     # self.get_logger().info("Map completed threshold set to: %s" %self.map_completed_thres)
+    #     self.navigating = False
+    #     while not self.stop_discovering:
+    #         self.send_goal()
+    #         # self.get_logger().warning('self.send_goal() done')
 
-        self.get_logger().info(f'Discovering Finished')
+    #     self.get_logger().info(f'Discovering Finished')
 
-        goal_handle.succeed()
-        result = Discover.Result()
-        result.result = True
-        return result
+    #     goal_handle.succeed()
+    #     result = Discover.Result()
+    #     result.result = True
+    #     return result
 
     def fetch_goal(self):
         # create goal command
