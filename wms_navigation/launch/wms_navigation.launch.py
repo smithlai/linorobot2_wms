@@ -44,7 +44,7 @@ def generate_launch_description():
     )
 
     nav2_config_path = PathJoinSubstitution(
-        [pkg_share, 'config', 'navigation.yaml']
+        [pkg_share, 'config', 'nav2_tst.yaml']
     )
 
     # Make re-written yaml
@@ -120,17 +120,17 @@ def generate_launch_description():
             
             output='screen'
         ),
-        Node(
-            # condition=IfCondition(LaunchConfiguration("auto_slam")),
-            condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("auto_slam")])),
-            package='wms_navigation',
-            executable='discovery_server.py',
-            name='discovery_server',
-            # equals to: launch_arguments = {'params_file': params_file}.items(),
-            parameters = [
-                {'use_sim_time': LaunchConfiguration("sim")},
-                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
-            ],
-            output='screen'
-        )
+        #Node(
+        #    # condition=IfCondition(LaunchConfiguration("auto_slam")),
+        #    condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("auto_slam")])),
+        #    package='wms_navigation',
+        #    executable='discovery_server.py',
+        #    name='discovery_server',
+        #    # equals to: launch_arguments = {'params_file': params_file}.items(),
+        #    parameters = [
+        #        {'use_sim_time': LaunchConfiguration("sim")},
+        #        PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
+        #    ],
+        #    output='screen'
+        #)
     ])
