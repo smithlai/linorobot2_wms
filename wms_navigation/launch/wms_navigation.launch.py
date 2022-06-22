@@ -97,24 +97,8 @@ def generate_launch_description():
             default_value='False',
             description='Analyze map according to SlamToolbox'
         ),
-        DeclareLaunchArgument(
-            name='exploration_node', 
-            default_value='False',
-            description='Launch Node to autonomous Slam according to map_analyzer'
-        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(nav2_launch_path),
-            condition=IfCondition(LaunchConfiguration("exploration_node")),
-            launch_arguments={
-                'slam': LaunchConfiguration("slam"), # slam will eliminate map server (default_map_path)
-                'map': LaunchConfiguration("map"),
-                'use_sim_time': LaunchConfiguration("sim"),
-                'params_file': nav2_config_lino
-            }.items()
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(nav2_launch_path),
-            condition=UnlessCondition(LaunchConfiguration("exploration_node")),
             launch_arguments={
                 'slam': LaunchConfiguration("slam"), # slam will eliminate map server (default_map_path)
                 'map': LaunchConfiguration("map"),
@@ -144,18 +128,5 @@ def generate_launch_description():
             ],
             
             output='screen'
-        ),
-        Node(
-           # condition=IfCondition(LaunchConfiguration("map_analyzer")),
-           condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("map_analyzer"), ' and ', LaunchConfiguration("exploration_node")])),
-           package='wms_navigation',
-           executable='discovery_server.py',
-           name='discovery_server',
-           # equals to: launch_arguments = {'params_file': params_file}.items(),
-           parameters = [
-               {'use_sim_time': LaunchConfiguration("sim")},
-               PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
-           ],
-           output='screen'
         )
     ])

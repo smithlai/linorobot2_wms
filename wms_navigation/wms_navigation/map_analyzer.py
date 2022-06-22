@@ -24,8 +24,13 @@ from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid, Odometry
 from geometry_msgs.msg import Point, Pose, PoseArray
 # 3rd party
+import time
 import numpy as np
-# import matplotlib.pyplot as plt
+import scipy.signal
+import scipy.ndimage
+# import scipy.ndimage.label
+from skimage import feature
+import matplotlib.pyplot as plt
 
 class MapAnalyzer(Node):
     def __init__(self):
@@ -33,15 +38,15 @@ class MapAnalyzer(Node):
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('candidates_radius_num', 40),
-                ('candidates_pixel_step', 1),
-                ('convolution_size', 3),
+                ('local_radius', 100),
+                ('kernal_size', 9),
                 ('map_topic', 'map'),
                 ('odom_topic', 'odom'),
                 ('local_candidate_topic', 'local_candidate_topic')
             ])
         map_topic = self.get_parameter('map_topic').value
         odom_topic = self.get_parameter('odom_topic').value
+        
         local_candidate_topic = self.get_parameter('local_candidate_topic').value
         self.occupancy_subscription = self.create_subscription(OccupancyGrid, map_topic, self.occupancy_callback, 10)
         self.odom_subscription = self.create_subscription(Odometry, odom_topic, self.odom_callback, 10)
@@ -50,14 +55,23 @@ class MapAnalyzer(Node):
             f'/{local_candidate_topic}', 
             1)
         self.busy_occupancy_callback = False
-        candidates_radius_num = self.get_parameter('candidates_radius_num').value
-        candidates_pixel_step = self.get_parameter('candidates_pixel_step').value
         self.robot_position = None
-        # create a 100*100 map, each axis coordinate increased by 0.2m, that is [0.0,0.2,0.4...19.8] 
-        # ([(x1,y1),(x2,y2)......])
-        self.nearby_candidates = self.generate_list_of_candidates(candidates_radius_num=candidates_radius_num, step=candidates_pixel_step)
-        self.sorted_accessible_local_candidates = np.array([])
-        # self.fig = plt.figure()
+
+        self.fig = plt.figure()
+
+    def convolute(self, full_map, valid_mask, k_size=15, iteration=1):
+        k_width = (k_size//2)
+        # conv_base = np.array(full_map[y_min:y_max, x_min:x_max])
+        
+        k = np.ones([k_size, k_size])
+        k[k_width, k_width] = 0 
+
+        conv_base = np.array(full_map)
+        for i in range(iteration):
+            conv_result = scipy.signal.convolve2d(conv_base, k, mode='same', boundary='fill', fillvalue=100)
+            conv_result = np.where(valid_mask & (conv_result <= 0), conv_result, 0 )
+            conv_base = conv_result
+        return conv_result
 
     def occupancy_callback(self, msg):
         """
@@ -68,10 +82,12 @@ class MapAnalyzer(Node):
         :param msg: OccupancyGrid message. Includes map metadata and an array with the occupancy probability values
         :return: None
         """
+        self.get_logger().info(f"======= occupancy_callback start =========")
+        
         if self.busy_occupancy_callback:
-            self.get_logger().info(f"-----------------------------X")
+            self.get_logger().info(f"------- occupancy_callback cancel (busying)------")
             return
-        self.get_logger().info(f"-----------------------------1")
+        
         self.busy_occupancy_callback=True
         data = np.array(msg.data)  # download the occupancy grid
         current_map_width = msg.info.width  # get the current map width
@@ -92,77 +108,72 @@ class MapAnalyzer(Node):
         #         if image[j,i] != 0:
         #             self.get_logger().info(f"{image[j,i]}")
 
-        # https://stackoverflow.com/questions/28269157/plotting-in-a-non-blocking-way-with-matplotlib
+        
 
         # Local Candidate
         if not self.robot_position:
+            self.get_logger().info(f"------- occupancy_callback cancel (no robot info)------")
             pass
         else:
-            # Here we go through every candidate and save the ones that are accessible.
-            # An accessible candidate is one which has no obstacles, and has few or no unknown squares in the vicinity.
-            local_accessible_candidates = np.array([], dtype=np.int32) #([(x1,y1),(x2,y2)......])
-            occupancy_value = np.array([])
-            for candidate in self.nearby_candidates: #([(x1,y1),(x2,y2)......])
-                try:
-                    x = round(candidate[0]) + robot_position_x
-                    y = round(candidate[1]) + robot_position_y
-                    if x < 0 or y < 0:
-                        continue
-                    occupancy_grid_coordinate = [x, y]
-                    convolution_size = self.get_parameter('convolution_size').value
-                    conv_accessable, worth = self.convolute(data, occupancy_grid_coordinate, size=convolution_size)  # perform convolution
+            startT = time.time()
+            full_map = np.copy(data)
+            
+            # Dilate all wall points
+            wall_mask = scipy.ndimage.grey_dilation(data, size=(25,25))
 
-                    # if the convolution returns True, it means the WP is accessible (under threshold), 
-                    # so it is stored in local_accessible_candidates
-                    if conv_accessable:
-                        local_accessible_candidates = np.append(local_accessible_candidates, occupancy_grid_coordinate)
-                        occupancy_value = np.append(occupancy_value, worth)
-                    else:
-                        pass
-                # because the candidate array is over-sized, we need to remove the values that are out of range
-                except IndexError:
-                    pass
-            # reshape the accessible candidates array to shape (n, 2)
-            local_accessible_candidates = local_accessible_candidates.reshape((-1, 2))  #([(x1,y1),(x2,y2)......])
-            # Sorting candidates according to occupancy value. This allows the robot to prioritize the candidates with
-            # more uncertainty (it wont access the areas that are completely clear, thus going to the discovery frontier)
-            # [::-1] reverses the array
-            # https://stackoverflow.com/questions/16486252/is-it-possible-to-use-argsort-in-descending-order
-            sorted_local_occupancy_value_idxs = occupancy_value.argsort()[::-1]
-            self.sorted_accessible_local_candidates = local_accessible_candidates[sorted_local_occupancy_value_idxs]
-            sorted_local_occupancy_value = occupancy_value[sorted_local_occupancy_value_idxs]
+            # remove wall point
+            valid_mask = np.where(wall_mask > 0, False, True)
+            
+            # remove unknown point
+            valid_mask = np.where(full_map < 0, False, valid_mask)
+            
+            # Union robot range and empty point
+            local_radius = self.get_parameter('local_radius').value
+            y_min = max(robot_position_y-local_radius, 0)
+            y_max = robot_position_y+local_radius
+            x_min = max(robot_position_x-local_radius, 0)
+            x_max = robot_position_x+local_radius
 
-            # At the beginning, when all values are uncertain, we add some hardcoded candidates so it begins to navigate
-            # and has time to discover accessible areas
-            # if np.size(self.sorted_accessible_local_candidates) == 0:
-            #     self.sorted_accessible_local_candidates = np.array([[1.5, 0.0], [0.0, 1.5], [-1.5, 0.0], [0.0, -1.5]])
+            radius_mask = np.full_like(data, False)
+            radius_mask[y_min:y_max, x_min:x_max] = True
+            
+            # conv to get most unknown points
+            kernal_size = self.get_parameter('kernal_size').value
+            conv_result = self.convolute(full_map, valid_mask, k_size=kernal_size, iteration=1)
+            
+            local_conv = np.where(radius_mask, conv_result, 0)
 
-            # for i in range(self.sorted_accessible_local_candidates.shape[0]):
-            #     candidate = self.sorted_accessible_local_candidates[i]
-            #     if i == 0:
-            #         size = 3
-            #     elif i <= 5:
-            #         size = 2
-            #     elif i <= 10:
-            #         size = 1
-            #     else:
-            #         size = 0
-            #     image[candidate[1]-size:candidate[1]+size,candidate[0]-size:candidate[0]+size] = 100 # + round(sorted_local_occupancy_value[i] * 2) + 20  #sorted_local_occupancy_value[i]*2
+            global_conv = np.where(np.logical_not(radius_mask), conv_result, 0)
+            # equals to: global_conv = np.where(radius_mask, 0, conv_result)
+            
+            # ==== local
+            local_cord = np.where(local_conv < 0)
+            local_values = local_conv[local_cord]
+            # x,y
+            local_candidates = np.asarray(local_cord).T[:,::-1]
+            local_sorted_index = local_values.argsort()
+            local_values = local_values[local_sorted_index]
+            local_candidates = local_candidates[local_sorted_index]
+            local_candidates = local_candidates[:3]
 
-            # cmap = 'gray_r'
-            # origin='lower'
-            # plt.figimage(image, cmap=cmap, origin=origin)
-            # self.fig.canvas.draw()
-            # plt.pause(0.01)
-            # Once we have the new candidates, 
-            # they are saved in self.sorted_accessible_local_candidates for use by the Navigator client
-            # self.get_logger().info('Accessible candidates have been updated...')
+            # ==== global
+            global_cord = np.where(global_conv < 0)
+            global_values = global_conv[global_cord]
+            # x,y
+            global_candidates = np.asarray(global_cord).T[:,::-1]
 
-            # To robot coordination
-            self.get_logger().info(f"-----------------------------2")
+            global_sorted_index = global_values.argsort()
+            global_values = global_values[global_sorted_index]
+            global_candidates = global_candidates[global_sorted_index]
+            global_candidates = global_candidates[:3]
+
+            all_candidates = np.concatenate((local_candidates,global_candidates),axis=0)
+            deltaT = time.time() - startT
+            self.get_logger().info(f"-------- Got {all_candidates.shape[0]} candidates, cost. {deltaT} ------")
+            startT = time.time()
             msg = PoseArray()
-            for i in range(min(self.sorted_accessible_local_candidates.shape[0], 1)):
-                candidate = self.sorted_accessible_local_candidates[i]
+            for i in range(min(all_candidates.shape[0], 5)):
+                candidate = all_candidates[i]
                 new_position_x = candidate[0] * resolution + shiftX
                 new_position_y = candidate[1] * resolution + shiftY
                 new_p = Pose()
@@ -170,14 +181,22 @@ class MapAnalyzer(Node):
                 new_p.position.y = new_position_y
                 # new_p.position.z = 0.0
                 msg.poses.append(new_p)
-                # self.get_logger().info(f"-----{robot_position_x},{robot_position_y}")
-                # self.get_logger().info(f"-----{candidate[0]},{candidate[1]}")
-                # self.get_logger().info(f"-----{self.robot_position.x},{self.robot_position.y}")
-                # self.get_logger().info(f"-----{round(new_position_x,2)},{round(new_position_y,2)}")
-            
             self.my_local_candidates_publisher.publish(msg)
-        # import time
-        # time.sleep(3)
+            
+            # https://stackoverflow.com/questions/28269157/plotting-in-a-non-blocking-way-with-matplotlib
+            # full_map = np.where(full_map < 0, 50, full_map)
+            # for i in range(min(all_candidates.shape[0], 5)):
+            #     size = 5 - (i)
+            #     candidate = all_candidates[i]
+            #     # self.get_logger().info(f"candidate{i}. {candidate} -> {candidate[1]}:-size:candidate[1]+size, candidate[0]-size:candidate[0]+size]}")
+            #     full_map[candidate[1]-size:candidate[1]+size, candidate[0]-size:candidate[0]+size] = 100
+                
+            # cmap = 'gray_r'
+            # origin='lower'
+            # plt.figimage(full_map, cmap=cmap, origin=origin)
+            # self.fig.canvas.draw()
+            # plt.pause(0.01)
+            
         self.busy_occupancy_callback=False
 
     def odom_callback(self, msg):      
@@ -187,68 +206,6 @@ class MapAnalyzer(Node):
         self.robot_position = position
         # self.get_logger().info(f'self.robot_position={self.robot_position}')  
 
-    @staticmethod
-    def convolute(data, coordinates, size=3): # , threshold=40
-        """
-        This function calculates the average occupancy probability at 'coordinates' for an area of size (size x size)
-        around said point.
-
-        :param data: Occupancy Grid Data (shaped to (x, y) map dimensions)
-        :param coordinate: the coordinate (x,y) of the OccupancyGrid to convolute around 
-        :param size: size of the kernel
-        :param threshold: threshold of accessibility
-        :return: True or False, depending on whether the candidate is accessible or not.
-        :return: worth: The worth level
-        """
-        worth = 0
-        isKnownCenter = False
-        adjacentWall = False
-        centerOccupied = data[coordinates[1], coordinates[0]]
-        if centerOccupied >= 0 and centerOccupied <= 10:
-            isKnownCenter = True
-
-        if isKnownCenter:
-            for y in range(round(coordinates[1] - size / 2), round(coordinates[1] + size / 2)):
-                for x in range(round(coordinates[0] - size / 2), round(coordinates[0] + size / 2)):
-                    # if the area is unknown, we add 100 to worth.
-                    if data[y, x] == -1:
-                        worth += 100
-                    # access areas near walls.
-                    elif data[y, x] > 50:
-                        adjacentWall = True
-                        worth += 0
-                        break
-                    else:
-                        worth += 1 if worth > 0 else 0
-
-        if worth > 0 and isKnownCenter and not adjacentWall:
-            return True, worth
-        else:
-            return False, worth
-
-    def generate_list_of_candidates(self, candidates_radius_num, step):
-        """
-
-        Generates a grid of candidates of size ('candidates_radius_num*2' * 'candidates_radius_num*2') and step size 'step'
-
-        :param candidates_radius_num: number of total candidates to generate per side
-        :param step: float resolution of the candidates
-        :return candidates: 2D numpy array of a list of coordinates of size dim x 2,
-        where dim is the number of candidates [x1,y1,x2,y2......]
-        """
-        diameter = candidates_radius_num * 2 + 1
-        candidates = np.zeros((diameter ** 2 , 2))
-
-        i = 0
-        radius = candidates_radius_num * step
-        # center_shift = edge/2
-        for index_y in range(diameter):
-            for index_x in range(diameter):
-                candidates[i] = [float(index_x) * step - radius, float(index_y)*step - radius]
-                i += 1
-
-        self.get_logger().info(f"Grid of {i} candidates has been generated. step={step}")
-        return candidates
 
 def main(args=None):
     rclpy.init(args=args)
