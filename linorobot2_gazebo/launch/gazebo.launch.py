@@ -69,7 +69,7 @@ def generate_launch_description():
                 {'use_sim_time': use_sim_time}, 
                 ekf_config_path
             ],
-            remappings=[("odometry/filtered", "odom")]
+            # remappings=[("odometry/filtered", "odom")]
         ),
 
         IncludeLaunchDescription(

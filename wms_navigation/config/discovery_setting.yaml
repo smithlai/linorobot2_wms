@@ -6,7 +6,8 @@ map_analyzer:  # /map_analyzer or map_analyzer are both acceptable
     candidates_pixel_step: 2
     convolution_size: 15
     map_topic: 'map'
-    odom_topic: 'odom'
+    odom_topic: 'odometry/filtered'
+
     use_sim_time: True
 
     # int_array:
