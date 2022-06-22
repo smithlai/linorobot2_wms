@@ -18,9 +18,10 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.substitutions import PythonExpression
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
+from nav2_common.launch import RewrittenYaml
 
 package_name = 'wms_navigation'
 pkg_share = FindPackageShare(package=package_name).find(package_name)
@@ -42,9 +43,30 @@ def generate_launch_description():
         [pkg_share, 'maps', f'{MAP_NAME}.yaml']
     )
 
-    nav2_config_path = PathJoinSubstitution(
+    nav2_config_lino = PathJoinSubstitution(
+        [pkg_share, 'config', 'nav2_lino.yaml']
+    )
+    nav2_config_addison = PathJoinSubstitution(
         [pkg_share, 'config', 'nav2_tst.yaml']
     )
+
+    # Make re-written yaml
+    param_substitutions = {
+        # 'use_sim_time': LaunchConfiguration("sim"),
+        'default_nav_to_pose_bt_xml': PathJoinSubstitution([pkg_share, 'config', 'navigate_to_position_w_replanning_and_recovery.xml'])
+    }
+
+    nav2_config_lino = RewrittenYaml(
+        source_file=nav2_config_lino,
+        root_key='',
+        param_rewrites=param_substitutions,
+        convert_types=True)
+
+    nav2_config_addison = RewrittenYaml(
+        source_file=nav2_config_addison,
+        root_key='',
+        param_rewrites=param_substitutions,
+        convert_types=True)
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -71,17 +93,33 @@ def generate_launch_description():
             description='Navigation map path'
         ),
         DeclareLaunchArgument(
-            name='auto_slam', 
+            name='map_analyzer', 
             default_value='False',
-            description='Autonomous Slam according to SlamToolbox and Nav2'
+            description='Analyze map according to SlamToolbox'
+        ),
+        DeclareLaunchArgument(
+            name='exploration_node', 
+            default_value='False',
+            description='Launch Node to autonomous Slam according to map_analyzer'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(nav2_launch_path),
+            condition=IfCondition(LaunchConfiguration("exploration_node")),
             launch_arguments={
                 'slam': LaunchConfiguration("slam"), # slam will eliminate map server (default_map_path)
                 'map': LaunchConfiguration("map"),
                 'use_sim_time': LaunchConfiguration("sim"),
-                'params_file': nav2_config_path
+                'params_file': nav2_config_lino
+            }.items()
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(nav2_launch_path),
+            condition=UnlessCondition(LaunchConfiguration("exploration_node")),
+            launch_arguments={
+                'slam': LaunchConfiguration("slam"), # slam will eliminate map server (default_map_path)
+                'map': LaunchConfiguration("map"),
+                'use_sim_time': LaunchConfiguration("sim"),
+                'params_file': nav2_config_addison
             }.items()
         ),
         Node(
@@ -94,31 +132,30 @@ def generate_launch_description():
             parameters=[{'use_sim_time': LaunchConfiguration("sim")}]
         ),
         Node(
-            # condition=IfCondition(LaunchConfiguration("auto_slam")),
-            condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("auto_slam")])),
+            # condition=IfCondition(LaunchConfiguration("map_analyzer")),
+            condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("map_analyzer")])),
             package='wms_navigation',
             executable='map_analyzer.py',
             name='map_analyzer',
             # equals to: launch_arguments = {'params_file': params_file}.items(),
             parameters = [
                 {'use_sim_time': LaunchConfiguration("sim")},
-                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml'])
-                
+                PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml'])                
             ],
             
             output='screen'
         ),
-        #Node(
-        #    # condition=IfCondition(LaunchConfiguration("auto_slam")),
-        #    condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("auto_slam")])),
-        #    package='wms_navigation',
-        #    executable='discovery_server.py',
-        #    name='discovery_server',
-        #    # equals to: launch_arguments = {'params_file': params_file}.items(),
-        #    parameters = [
-        #        {'use_sim_time': LaunchConfiguration("sim")},
-        #        PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
-        #    ],
-        #    output='screen'
-        #)
+        Node(
+           # condition=IfCondition(LaunchConfiguration("map_analyzer")),
+           condition=IfCondition(PythonExpression([LaunchConfiguration("slam"), ' and ', LaunchConfiguration("map_analyzer"), ' and ', LaunchConfiguration("exploration_node")])),
+           package='wms_navigation',
+           executable='discovery_server.py',
+           name='discovery_server',
+           # equals to: launch_arguments = {'params_file': params_file}.items(),
+           parameters = [
+               {'use_sim_time': LaunchConfiguration("sim")},
+               PathJoinSubstitution([FindPackageShare('wms_navigation'), 'config', 'discovery_setting.yaml']),
+           ],
+           output='screen'
+        )
     ])

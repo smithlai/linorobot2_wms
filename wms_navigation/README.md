@@ -32,8 +32,14 @@ ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=T
 _OR_  
 > Autonomous  
 ```sh
-ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True auto_slam:=True
-ros2 action send_goal /discover wms_interfaces/action/Discover "{map_completed_thres : 0.0}"
+# 1
+ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True map_analyzer:=True exploration_node:=False
+
+ros2 launch myautomapping automapping2.launch.py
+
+# or
+# 2
+ros2 launch wms_navigation wms_navigation.launch.py rviz:=True sim:=True slam:=True map_analyzer:=True exploration_node:=True
 ```
 
 4. save the map

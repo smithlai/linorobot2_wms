@@ -4,7 +4,7 @@ map_analyzer:  # /map_analyzer or map_analyzer are both acceptable
   ros__parameters:
     candidates_radius_num: 100
     candidates_pixel_step: 2
-    convolution_size: 9
+    convolution_size: 15
     map_topic: 'map'
     odom_topic: 'odom'
     use_sim_time: True

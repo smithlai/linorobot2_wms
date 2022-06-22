@@ -49,7 +49,7 @@ class DiscovererServer(Node):
         self.group3 = ReentrantCallbackGroup()  # MutuallyExclusiveCallbackGroup()
 
         # This Action server
-        self._action_server = ActionServer(self, Discover, 'discover', self.execute_callback, callback_group=self.group1)
+        # self._action_server = ActionServer(self, Discover, 'discover', self.execute_callback, callback_group=self.group1)
 
         # Describe candidate data
         local_candidate_topic = self.get_parameter('local_candidate_topic').value
@@ -57,7 +57,7 @@ class DiscovererServer(Node):
         self.local_candidate_subscriber = self.create_subscription(PoseArray, local_candidate_topic, self.local_candidate_callback, 1, callback_group=self.group2)
 
         # Register Nav client
-        self._action_client = ActionClient(self, NavigateToPose, 'navigate_to_pose', callback_group=self.group3)
+        self.nav2_client = ActionClient(self, NavigateToPose, 'navigate_to_pose', callback_group=self.group3)
 
         # Global variables
         self.stop_discovering = False
@@ -70,49 +70,26 @@ class DiscovererServer(Node):
         poses = msg.poses
         self.sorted_local_candidates = poses
         self.get_logger().info(f"sorted_local_candidates UPDATED: {len(self.sorted_local_candidates)}")   
+        self.navigating = False
+        self.send_goal()
 
 
             
-    def execute_callback(self, goal_handle):
-        self.get_logger().info("Discoverer Server received a goal")
-        # self.map_completed_thres=goal_handle.request.map_completed_thres
-        # self.get_logger().info("Map completed threshold set to: %s" %self.map_completed_thres)
-        while not self.stop_discovering:
-            self.send_goal()
-            # self.get_logger().warning('self.send_goal() done')
+    # def execute_callback(self, goal_handle):
+    #     self.get_logger().info("Discoverer Server received a goal")
+    #     # self.map_completed_thres=goal_handle.request.map_completed_thres
+    #     # self.get_logger().info("Map completed threshold set to: %s" %self.map_completed_thres)
+    #     self.navigating = False
+    #     while not self.stop_discovering:
+    #         self.send_goal()
+    #         # self.get_logger().warning('self.send_goal() done')
 
-        self.get_logger().info(f'Discovering Finished')
+    #     self.get_logger().info(f'Discovering Finished')
 
-        goal_handle.succeed()
-        result = Discover.Result()
-        result.result = True
-        return result
-
-    """
-    send_goal -> goal_response_callback -> get_result_callback
-    """
-    def goal_response_callback(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            # self.stop_discovering = True
-            self.get_logger().info('Exploration goal rejected')
-            self.navigating = False
-            return
-
-        self.get_logger().info('Navigation goal accepted')
-
-        _get_result_future = goal_handle.get_result_async()
-        _get_result_future.add_done_callback(self.get_result_callback)
-
-    def get_result_callback(self, future):
-        result = future.result().result
-        status = future.result().status
-        if status == GoalStatus.STATUS_SUCCEEDED:
-            self.get_logger().info('Arrived at destination')
-        else:
-            # self.stop_discovering = True
-            self.get_logger().info('Goal failed with status: {0}'.format(status))
-        self.navigating = False
+    #     goal_handle.succeed()
+    #     result = Discover.Result()
+    #     result.result = True
+    #     return result
 
     def fetch_goal(self):
         # create goal command
@@ -141,7 +118,7 @@ class DiscovererServer(Node):
             return
         self.navigating = True  
         self.get_logger().info('Waiting for Navigation server...start')
-        self._action_client.wait_for_server()
+        self.nav2_client.wait_for_server()
         self.get_logger().info('Waiting for Navigation server...done')
 
         goal_msg = self.fetch_goal()
@@ -152,7 +129,7 @@ class DiscovererServer(Node):
             return
 
         # Send goal and wait
-        _send_goal_future = self._action_client.send_goal_async(goal_msg)
+        _send_goal_future = self.nav2_client.send_goal_async(goal_msg)
         # check goal accept or reject, if accepted, add self.get_result_callback
         _send_goal_future.add_done_callback(self.goal_response_callback)
         # rclpy.spin_until_future_complete(self, _send_goal_future)
@@ -162,6 +139,32 @@ class DiscovererServer(Node):
         # goal_handle = _send_goal_future.result()
         # get_result_future = goal_handle.get_result_async()
         # rclpy.spin_until_future_complete(self, get_result_future)
+
+    """
+    send_goal -> goal_response_callback -> get_result_callback
+    """
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            # self.stop_discovering = True
+            self.get_logger().info('Exploration goal rejected')
+            self.navigating = False
+            return
+
+        self.get_logger().info('Navigation goal accepted')
+
+        _get_result_future = goal_handle.get_result_async()
+        _get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        status = future.result().status
+        if status == GoalStatus.STATUS_SUCCEEDED:
+            self.get_logger().info('Arrived at destination')
+        else:
+            # self.stop_discovering = True
+            self.get_logger().info('Goal failed with status: {0}'.format(status))
+        self.navigating = False
 
 
 
